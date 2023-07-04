@@ -8,6 +8,7 @@ public class NoteKeepBotApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(NoteKeepBotApplication.class, args);
+
     }
 
 }
