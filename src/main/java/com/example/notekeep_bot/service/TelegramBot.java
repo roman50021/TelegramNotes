@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+
+
 @Slf4j
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
@@ -61,24 +63,30 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        if(update.hasMessage() && update.getMessage().hasText()){
+        if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
+            boolean creatingNote = false; // Флаг, указывающий на процесс создания заметки
 
-            switch (messageText){
-                case "/start":
-                    start(chatId);
-                    break;
-                case "Create note":
-
-
-                    break;
-                case "List of notes":
-
-                    break;
+            if (messageText.equals("/start")) {
+                start(chatId);
+            } else if (messageText.equals("Create note")) {
+                createNote(chatId);
+                creatingNote = true; // Устанавливаем флаг, чтобы указать на начало создания заметки
+            } else if (creatingNote == true) {
+                processNoteTitle(chatId, messageText);
+                creatingNote = true; // Сбрасываем флаг после создания заметки
+            } else if (creatingNote == true){
+                processNoteContent(chatId, messageText);
+                // Добавьте обработку неизвестной команды или сообщения
             }
         }
     }
+
+
+
+
+
     /////////////////////////////////  \/Создание заметки\/  ///////////////////////////////////////////////
     private void createNote(long chatId) {
         SendMessage sendMessageRequest = new SendMessage();
@@ -94,35 +102,78 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     // Добавьте этот метод для обработки полученных данных от пользователя
     private void processNoteTitle(long chatId, String title) {
-        // Сохраните заголовок заметки и запросите содержимое заметки
-        // Далее, вызовите метод processNoteContent() для обработки полученных данных
-        // и сохранения заметки в базе данных
-        // ...
+        User user = userRepository.findByChatId(chatId);
+        if (user != null) {
+            Note note = new Note();
+            note.setUser(user);
+            note.setTitle(title);
+            note.setCreatedAt(new Timestamp(System.currentTimeMillis()));
 
-        SendMessage sendMessageRequest = new SendMessage();
-        sendMessageRequest.setChatId(String.valueOf(chatId));
-        sendMessageRequest.setText("Введите содержимое заметки:");
+            // Сохранение заметки в базе данных
+            noteRepository.save(note);
 
-        try {
-            execute(sendMessageRequest);
-        } catch (TelegramApiException e) {
-            log.error("Ошибка при отправке сообщения пользователю: {}", e.getMessage());
+            SendMessage sendMessageRequest = new SendMessage();
+            sendMessageRequest.setChatId(String.valueOf(chatId));
+            sendMessageRequest.setText("Введите содержимое заметки:");
+
+            try {
+                execute(sendMessageRequest);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке сообщения пользователю: {}", e.getMessage());
+            }
+        } else {
+            SendMessage sendMessageRequest = new SendMessage();
+            sendMessageRequest.setChatId(String.valueOf(chatId));
+            sendMessageRequest.setText("Пользователь не найден. Пожалуйста, используйте команду /start для начала.");
+
+            try {
+                execute(sendMessageRequest);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке сообщения пользователю: {}", e.getMessage());
+            }
         }
     }
 
     // Добавьте этот метод для обработки полученных данных от пользователя
     private void processNoteContent(long chatId, String content) {
-        // Создайте новую заметку и сохраните ее в базе данных
-        // ...
+        User user = userRepository.findByChatId(chatId);
+        if (user != null) {
+            Note note = noteRepository.findByUserId(user.getChatId());
+            if (note != null) {
+                note.setContext(content);
+                // Обновление заметки в базе данных
+                noteRepository.save(note);
 
-        SendMessage sendMessageRequest = new SendMessage();
-        sendMessageRequest.setChatId(String.valueOf(chatId));
-        sendMessageRequest.setText("Заметка успешно создана!");
+                SendMessage sendMessageRequest = new SendMessage();
+                sendMessageRequest.setChatId(String.valueOf(chatId));
+                sendMessageRequest.setText("Заметка успешно создана!");
 
-        try {
-            execute(sendMessageRequest);
-        } catch (TelegramApiException e) {
-            log.error("Ошибка при отправке сообщения пользователю: {}", e.getMessage());
+                try {
+                    execute(sendMessageRequest);
+                } catch (TelegramApiException e) {
+                    log.error("Ошибка при отправке сообщения пользователю: {}", e.getMessage());
+                }
+            } else {
+                SendMessage sendMessageRequest = new SendMessage();
+                sendMessageRequest.setChatId(String.valueOf(chatId));
+                sendMessageRequest.setText("Заметка не найдена. Пожалуйста, используйте команду /start и создайте новую заметку.");
+
+                try {
+                    execute(sendMessageRequest);
+                } catch (TelegramApiException e) {
+                    log.error("Ошибка при отправке сообщения пользователю: {}", e.getMessage());
+                }
+            }
+        } else {
+            SendMessage sendMessageRequest = new SendMessage();
+            sendMessageRequest.setChatId(String.valueOf(chatId));
+            sendMessageRequest.setText("Пользователь не найден. Пожалуйста, используйте команду /start для начала.");
+
+            try {
+                execute(sendMessageRequest);
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке сообщения пользователю: {}", e.getMessage());
+            }
         }
     }
 
