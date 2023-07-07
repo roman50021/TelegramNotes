@@ -129,13 +129,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             userRepository.save(user);
             log.info("user saved: " + user);
-
-
         }
     }
 
     ////////////////////////////////   /\Создание заметки/\   //////////////////////////////////////////////
-
 
     private void start(long chatId){
          String answer = "Привет! Я бот помошник! Я могу создавать и сохранять заметки.";
