@@ -96,6 +96,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void creatNote(long chatId, String messageNote) {
+
         User user = userRepository.findByChatId(chatId);
         if (user == null) {
             sendMessage(chatId, "Пользователь не найден!");
