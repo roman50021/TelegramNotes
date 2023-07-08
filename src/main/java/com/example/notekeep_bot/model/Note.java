@@ -17,6 +17,22 @@ public class Note {
     private String context;
     private Timestamp createdAt;
 
+    public static String titleNote(String context) {
+        char [] list = context.toCharArray();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 7; i++) {
+            sb.append(list[i]);
+        }
+        return sb.toString() + "...";
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     public User getUser() {
         return user;
