@@ -1,8 +1,10 @@
 package com.example.notekeep_bot.model;
 
 import jakarta.persistence.*;
+import org.w3c.dom.Text;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Objects;
 
 @Entity(name = "notesDataTable")
@@ -17,15 +19,23 @@ public class Note {
 
 
     private String title;
+
+
     private String context;
+
     private Timestamp createdAt;
 
     public static String titleNote(String context) {
-        char [] list = context.toCharArray();
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 10; i++) {
-            sb.append(list[i]);
+        ArrayList<Character> charList = new ArrayList<>();
+        for (char ch : context.toCharArray()) {
+            charList.add(ch);
         }
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 15 && i < charList.size(); i++) {
+            sb.append(charList.get(i));
+        }
+
         return sb.toString() + " ...";
     }
 

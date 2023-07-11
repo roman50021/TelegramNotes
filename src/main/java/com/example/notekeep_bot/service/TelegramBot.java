@@ -66,6 +66,13 @@ public class TelegramBot extends TelegramLongPollingBot {
     private Long waitingNoteChatId = null;
     private Long waitingOutNote = null;
 
+    private Long waitingNoteEditChatId = null;
+    private String waitingNoteEditTitle = null;
+
+    private Long waitingNoteDelete = null;
+
+
+
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
@@ -76,28 +83,55 @@ public class TelegramBot extends TelegramLongPollingBot {
                 case "/start":
                     start(chatId);
                     registerUser(update.getMessage());
+
                     break;
-                case "Create note":
+                case "Create note ✏\uFE0F":
                     sendMessage(chatId, "Напиши сюда свою заметку: ");
                     // Устанавливаем chatId в качестве ожидающего ввода заметки
                     waitingNoteChatId = chatId;
                     break;
-                case "My notes":
+                case "My notes \uD83D\uDCC1":
+
                     sendNoteKeyboard(chatId);
 
                     break;
 
-                case "Back":
+                case "Back ↩":
                     sendMessage(chatId, "Меню");
                     break;
 
-                case "Edit note":
+                case "Edit notes \uD83D\uDCDD":
+                    sendNoteKeyboard(chatId);
+                    waitingNoteEditChatId  = chatId;
+
+
 
                     break;
-                case "Delete note":
+                case "Delete note \uD83D\uDDD1":
+                    sendNoteKeyboard(chatId);
+                    waitingNoteDelete = chatId;
+
+
 
                     break;
                 default:
+                    if (waitingNoteEditChatId  != null && waitingNoteEditChatId  == chatId) {
+                        if(waitingNoteEditTitle == null){
+                            waitingNoteEditTitle = messageText;
+                            sendMessage(chatId, "Отправь новое содержимое заметки!\nВот ваша старая заметка\n⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇ ");
+                        }else {
+                            String newContext = messageText;
+                            noteEdit(chatId, waitingNoteEditTitle, newContext);
+                            waitingNoteChatId = null;
+                            waitingNoteEditTitle = null;
+                        }
+                    }
+                    if (waitingNoteDelete != null && waitingNoteDelete == chatId) {
+                        String messageDelete = messageText;
+                        noteDelete(chatId, messageDelete);
+                        waitingNoteDelete = null;
+                    }
+
                     if (waitingOutNote != null && waitingOutNote == chatId) {
                         // Если да, то это введенная заметка
                         String messageOut = messageText;
@@ -119,8 +153,47 @@ public class TelegramBot extends TelegramLongPollingBot {
                     }
                     break;
             }
+
+        }
+
+    }
+
+
+
+    private void noteEdit(long chatId, String title, String newContext){
+        List<Note> notes = noteRepository.findByUser_ChatId(chatId);
+        Note foundNote = null;
+
+        for (Note note : notes) {
+            if (title.equals(note.getTitle())) {
+                foundNote = note;
+                break;
+            }
+        }
+        if (foundNote != null) {
+            foundNote.setContext(newContext);
+            foundNote.setTitle(titleNote(newContext));
+            foundNote.setCreatedAt(new Timestamp((System.currentTimeMillis())));
+            noteRepository.save(foundNote);
+            sendMessage(chatId, "Заметка обновлина успешно! ✅");
+
         }
     }
+
+    private void noteDelete(long chatId, String message){
+        List<Note> notes = noteRepository.findByUser_ChatId(chatId);
+        Note foundNote = null;
+        for(Note note : notes){
+            if(message.equals(note.getTitle())){
+                foundNote = note;
+            }
+        }
+        if(foundNote != null){
+            noteRepository.deleteById(foundNote.getId());
+            sendMessage(chatId, "Заметка удалена успешно! ✅");
+        }
+    }
+
     private void noteOut(long chatId, String message) {
         List<Note> notes = noteRepository.findByUser_ChatId(chatId);
         boolean noteFound = false;
@@ -128,19 +201,17 @@ public class TelegramBot extends TelegramLongPollingBot {
         for (Note note : notes) {
             if (message.equals(note.getTitle())) {
                 sendMessage(chatId, note.getContext());
+                sendNoteKeyboard(chatId);
                 noteFound = true;
                 break;
             }
         }
 
-        if (!noteFound) {
-            sendMessage(chatId, "Такой заметки не существует");
-        }
     }
     private void sendNoteKeyboard(long chatId) {
         List<Note> notes = noteRepository.findByUser_ChatId(chatId);
         if (notes.isEmpty()) {
-            sendMessage(chatId, "У вас нет сохраненных заметок.");
+            sendMessage(chatId, "У вас нет сохраненных заметок. ❌");
         } else {
             SendMessage message = new SendMessage();
             message.setChatId(String.valueOf(chatId));
@@ -157,7 +228,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
 
             KeyboardRow row = new KeyboardRow();
-            row.add("Back");
+            row.add("Back ↩");
             keyboardRows.add(row);
 
             keyboardMarkup.setKeyboard(keyboardRows);
@@ -165,6 +236,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             try {
                 execute(message);
+
             } catch (TelegramApiException e) {
                 log.error("Ошибка при отправке сообщения: {}", e.getMessage());
             }
@@ -179,16 +251,18 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(chatId, "Пользователь не найден!");
             return;
         }
+            Note note = new Note();
+            note.setUser(user);
+            note.setTitle(titleNote(messageNote));
+            note.setContext(messageNote);
+            note.setCreatedAt(new Timestamp(System.currentTimeMillis()));
 
-        Note note = new Note();
-        note.setUser(user);
-        note.setTitle(titleNote(messageNote));
-        note.setContext(messageNote);
-        note.setCreatedAt(new Timestamp(System.currentTimeMillis()));
 
-        noteRepository.save(note);
+            noteRepository.save(note);
 
-        sendMessage(chatId, "Заметка сохранена успешно!");
+            sendMessage(chatId, "Заметка сохранена успешно! ✅");
+
+
     }
 
     public void registerUser(Message msg) {
@@ -214,6 +288,7 @@ public class TelegramBot extends TelegramLongPollingBot {
          String answer = "Привет! Я бот помошник! Я могу создавать и сохранять заметки.";
          sendMessage(chatId, answer);
 
+
     }
     private void sendMessage(long chatId, String textToSend){
         SendMessage message = new SendMessage();
@@ -227,14 +302,21 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+
     private void keyboardMain(SendMessage message){
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         List<KeyboardRow> keyboardRows = new ArrayList<>();
         KeyboardRow row = new KeyboardRow();
-        row.add("Create note");
+        row.add("Create note ✏\uFE0F");
         keyboardRows.add(row);
         row = new KeyboardRow();
-        row.add("My notes");
+        row.add("My notes \uD83D\uDCC1");
+        keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Edit notes \uD83D\uDCDD");
+        keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Delete note \uD83D\uDDD1");
         keyboardRows.add(row);
 
 
