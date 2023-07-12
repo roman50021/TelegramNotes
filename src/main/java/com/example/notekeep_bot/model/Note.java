@@ -20,7 +20,7 @@ public class Note {
 
     private String title;
 
-
+    @Column(length = 4096)
     private String context;
 
     private Timestamp createdAt;

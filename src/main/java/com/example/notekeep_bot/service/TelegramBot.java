@@ -101,6 +101,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     break;
 
                 case "Edit notes \uD83D\uDCDD":
+                    sendMessage(chatId, "Отправь новое содержимое заметки!\nВот ваша старая заметка\n⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇ ");
                     sendNoteKeyboard(chatId);
                     waitingNoteEditChatId  = chatId;
 
@@ -111,33 +112,33 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendNoteKeyboard(chatId);
                     waitingNoteDelete = chatId;
 
-
-
                     break;
                 default:
+                    if (waitingNoteDelete != null && waitingNoteDelete == chatId) {
+                        String messageDelete = messageText;
+                        noteDelete(chatId, messageDelete);
+                        waitingNoteDelete = null;
+                        break;
+                    }
                     if (waitingNoteEditChatId  != null && waitingNoteEditChatId  == chatId) {
                         if(waitingNoteEditTitle == null){
                             waitingNoteEditTitle = messageText;
-                            sendMessage(chatId, "Отправь новое содержимое заметки!\nВот ваша старая заметка\n⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇ ");
+
                         }else {
                             String newContext = messageText;
                             noteEdit(chatId, waitingNoteEditTitle, newContext);
                             waitingNoteChatId = null;
                             waitingNoteEditTitle = null;
+                            break;
                         }
                     }
-                    if (waitingNoteDelete != null && waitingNoteDelete == chatId) {
-                        String messageDelete = messageText;
-                        noteDelete(chatId, messageDelete);
-                        waitingNoteDelete = null;
-                    }
-
                     if (waitingOutNote != null && waitingOutNote == chatId) {
                         // Если да, то это введенная заметка
                         String messageOut = messageText;
                         noteOut(chatId, messageOut);
                         // Сбрасываем состояние ожидания ввода заметки
                         waitingOutNote = null;
+                        break;
                     }
 
                     // Проверяем, находится ли чат в состоянии ожидания ввода заметки
@@ -147,11 +148,13 @@ public class TelegramBot extends TelegramLongPollingBot {
                         creatNote(chatId, messageNote);
                         // Сбрасываем состояние ожидания ввода заметки
                         waitingNoteChatId = null;
+                        break;
                     }
                     else {
                         noteOut(chatId, messageText);
+                        break;
                     }
-                    break;
+
             }
 
         }
@@ -164,12 +167,14 @@ public class TelegramBot extends TelegramLongPollingBot {
         List<Note> notes = noteRepository.findByUser_ChatId(chatId);
         Note foundNote = null;
 
+
         for (Note note : notes) {
             if (title.equals(note.getTitle())) {
                 foundNote = note;
                 break;
             }
         }
+
         if (foundNote != null) {
             foundNote.setContext(newContext);
             foundNote.setTitle(titleNote(newContext));
