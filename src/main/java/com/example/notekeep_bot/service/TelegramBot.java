@@ -1,10 +1,7 @@
 package com.example.notekeep_bot.service;
 
 import com.example.notekeep_bot.config.BotConfig;
-import com.example.notekeep_bot.model.Note;
-import com.example.notekeep_bot.model.NoteRepository;
-import com.example.notekeep_bot.model.User;
-import com.example.notekeep_bot.model.UserRepository;
+import com.example.notekeep_bot.model.*;
 import com.vdurmont.emoji.EmojiParser;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.query.spi.DomainQueryExecutionContext;
@@ -29,16 +26,14 @@ import java.util.*;
 
 import static com.example.notekeep_bot.model.Note.titleNote;
 
-
-
 @Slf4j
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
-
     @Autowired
     BotConfig config;
     private UserRepository userRepository;
     private NoteRepository noteRepository;
+    private ReminderRepository reminderRepository;
 
     @Autowired
     public void setUserRepository(UserRepository userRepository) {
@@ -48,6 +43,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Autowired
     public void setNoteRepository(NoteRepository noteRepository) {
         this.noteRepository = noteRepository;
+    }
+
+    @Autowired
+    private void  setReminderRepository(ReminderRepository reminderRepository){
+        this.reminderRepository = reminderRepository;
     }
 
 
@@ -71,8 +71,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private Long waitingNoteDelete = null;
 
-
-
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
@@ -81,6 +79,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             switch (messageText) {
                 case "/start":
+
                     start(chatId);
                     registerUser(update.getMessage());
 
@@ -101,16 +100,24 @@ public class TelegramBot extends TelegramLongPollingBot {
                     break;
 
                 case "Edit notes \uD83D\uDCDD":
+
                     sendMessage(chatId, "Отправь новое содержимое заметки!\nВот ваша старая заметка\n⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇⬇ ");
                     sendNoteKeyboard(chatId);
                     waitingNoteEditChatId  = chatId;
-
-
 
                     break;
                 case "Delete note \uD83D\uDDD1":
                     sendNoteKeyboard(chatId);
                     waitingNoteDelete = chatId;
+
+                    break;
+                case "Reminders \uD83D\uDD14":
+                    sendReminderKeyboard(chatId);
+
+                    break;
+
+                case "Create a reminder \uD83D\uDD14":
+                    sendCreateReminderboard(chatId);
 
                     break;
                 default:
@@ -160,13 +167,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
 
     }
-
-
-
     private void noteEdit(long chatId, String title, String newContext){
         List<Note> notes = noteRepository.findByUser_ChatId(chatId);
         Note foundNote = null;
-
 
         for (Note note : notes) {
             if (title.equals(note.getTitle())) {
@@ -288,12 +291,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-
     private void start(long chatId){
          String answer = "Привет! Я бот помошник! Я могу создавать и сохранять заметки.";
          sendMessage(chatId, answer);
-
-
     }
     private void sendMessage(long chatId, String textToSend){
         SendMessage message = new SendMessage();
@@ -306,8 +306,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
         }
     }
-
-
     private void keyboardMain(SendMessage message){
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
         List<KeyboardRow> keyboardRows = new ArrayList<>();
@@ -323,10 +321,96 @@ public class TelegramBot extends TelegramLongPollingBot {
         row = new KeyboardRow();
         row.add("Delete note \uD83D\uDDD1");
         keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Reminders \uD83D\uDD14");
+        keyboardRows.add(row);
 
 
         keyboardMarkup.setKeyboard(keyboardRows);
         message.setReplyMarkup(keyboardMarkup);
     }
+
+    private void sendReminderKeyboard(long chatId) {
+        List<Reminder> reminders = reminderRepository.findByUserChatId(chatId);
+
+            SendMessage message = new SendMessage();
+            message.setChatId(String.valueOf(chatId));
+            message.setText("Напоминания :");
+
+            ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+            List<KeyboardRow> keyboardRows = new ArrayList<>();
+
+            KeyboardRow row = new KeyboardRow();
+            row.add("Create a reminder \uD83D\uDD14");
+            keyboardRows.add(row);
+
+
+            for (Reminder reminder : reminders) {
+                row = new KeyboardRow();
+                row.add(reminder.getText());
+                keyboardRows.add(row);
+            }
+
+            row = new KeyboardRow();
+            row.add("Back ↩");
+            keyboardRows.add(row);
+
+            keyboardMarkup.setKeyboard(keyboardRows);
+            message.setReplyMarkup(keyboardMarkup);
+
+            try {
+                execute(message);
+
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке сообщения: {}", e.getMessage());
+            }
+    }
+
+    private void sendCreateReminderboard(long chatId) {
+        List<Reminder> reminders = reminderRepository.findByUserChatId(chatId);
+
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Когда ставим напоминание ?");
+
+        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        List<KeyboardRow> keyboardRows = new ArrayList<>();
+        KeyboardRow row = new KeyboardRow();
+        row.add("Через час  ⏰");
+        keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Завтра утром 8:00 \uD83D\uDD57");
+        keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Завтра днём 12:00 \uD83D\uDD5B");
+        keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Завтра вечером 17:00 \uD83D\uDD54");
+        keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Послезавтра утром 8:00 \uD83D\uDD57");
+        keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Послезавтра днём 12:00 \uD83D\uDD5B");
+        keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Послезавтра вечером 17:00 \uD83D\uDD54");
+        keyboardRows.add(row);
+        row = new KeyboardRow();
+        row.add("Back ↩");
+        keyboardRows.add(row);
+
+        keyboardMarkup.setKeyboard(keyboardRows);
+        message.setReplyMarkup(keyboardMarkup);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Ошибка при отправке сообщения: {}", e.getMessage());
+        }
+    }
+
+
+
 
 }
