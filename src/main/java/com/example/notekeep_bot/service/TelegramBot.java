@@ -433,15 +433,34 @@ public class TelegramBot extends TelegramLongPollingBot {
         reminder.setText(messageReminder);
         reminder.setCreatedAt(new Timestamp(System.currentTimeMillis()));
         reminder.setWorkAt(time);
-
-
         reminderRepository.save(reminder);
+
+
+        long delay = time.getTime() - System.currentTimeMillis();
+        if (delay > 0) {
+            scheduleReminder(delay, "\uD83D\uDD14 Напоминание : " + reminder.getText(), chatId, reminder.getId());
+
+        }else {
+            sendMessage(chatId, "Время напоминания уже прошло!");
+        }
 
         sendMessage(chatId, "Напоминалка сохранена успешно! ✅");
 
 
     }
+    private void scheduleReminder(long delay, String message, long chatId, long reminderId){
+        Timer timer = new Timer();
+        TimerTask reminderTask = new TimerTask() {
+            @Override
+            public void run() {
+                sendMessage(chatId, message);
+                reminderRepository.deleteById(reminderId);
+            }
 
+
+        };
+        timer.schedule(reminderTask, delay);
+    }
 
     private Timestamp getTime(String messageText) {
         if (messageText.equals("Через час  ⏰")) {
@@ -549,9 +568,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             return new Timestamp(date.getTime());
         }
-
         return null;
     }
+
+
 
 
 }
