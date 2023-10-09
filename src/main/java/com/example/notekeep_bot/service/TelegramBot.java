@@ -33,28 +33,17 @@ public class TelegramBot extends TelegramLongPollingBot {
     BotConfig config;
     private UserRepository userRepository;
     private NoteRepository noteRepository;
-    private ReminderRepository reminderRepository;
-
     @Autowired
     public void setUserRepository(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
-
     @Autowired
     public void setNoteRepository(NoteRepository noteRepository) {
         this.noteRepository = noteRepository;
     }
-
-    @Autowired
-    private void  setReminderRepository(ReminderRepository reminderRepository){
-        this.reminderRepository = reminderRepository;
-    }
-
-
     public TelegramBot(BotConfig config){
         this.config = config;
     }
-
     @Override
     public String getBotUsername() {
         return config.getBotName();
@@ -65,26 +54,14 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
     private Long waitingNoteChatId = null;
     private Long waitingOutNote = null;
-
     private Long waitingNoteEditChatId = null;
     private String waitingNoteEditTitle = null;
     private Long waitingNoteDelete = null;
-
-
-
-    private Long waitingTextReminder = null;
-    private Timestamp waitingTimeForReminder = null;
-
-
     @Override
     public void onUpdateReceived(Update update) {
-
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
-
-
-
             switch (messageText) {
                 case "/start":
                     start(chatId);
@@ -110,28 +87,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendNoteKeyboard(chatId);
                     waitingNoteDelete = chatId;
                     break;
-                case "Reminders \uD83D\uDD14":
-                    sendReminderKeyboard(chatId);
-                    break;
-
-                case "Create a reminder \uD83D\uDD14":
-                    sendCreateReminderKeyboard(chatId);
-                    waitingTextReminder = chatId;
-
-                    break;
                 default:
-                    if (waitingTextReminder != null && waitingTextReminder.equals(chatId)) {
-                        if (waitingTimeForReminder == null) {
-                            waitingTimeForReminder = getTime(messageText);
-                            sendMessage(chatId, "Отлично! Теперь напиши текст напоминания:");
-
-                        } else {
-                            createReminder(chatId, messageText, waitingTimeForReminder);
-                            waitingTextReminder = null;
-                            waitingTimeForReminder = null;
-                            break;
-                        }
-                    }
 
                     if (waitingNoteEditChatId  != null && waitingNoteEditChatId  == chatId) {
                         if(waitingNoteEditTitle == null){
@@ -264,8 +220,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }
     }
-
-
     private void creatNote(long chatId, String messageNote) {
 
         User user = userRepository.findByChatId(chatId);
@@ -286,7 +240,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
 
     }
-
     public void registerUser(Message msg) {
         if (userRepository.findById(msg.getChatId()).isEmpty()) {
             var chatId = msg.getChatId();
@@ -304,7 +257,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.info("user saved: " + user);
         }
     }
-
     private void start(long chatId){
          String answer = "Привет! Я бот помошник! Я могу создавать и сохранять заметки.";
          sendMessage(chatId, answer);
@@ -343,235 +295,5 @@ public class TelegramBot extends TelegramLongPollingBot {
         keyboardMarkup.setKeyboard(keyboardRows);
         message.setReplyMarkup(keyboardMarkup);
     }
-
-    private void sendReminderKeyboard(long chatId) {
-        List<Reminder> reminders = reminderRepository.findByUserChatId(chatId);
-
-            SendMessage message = new SendMessage();
-            message.setChatId(String.valueOf(chatId));
-            message.setText("Напоминания :");
-
-            ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-            List<KeyboardRow> keyboardRows = new ArrayList<>();
-
-            KeyboardRow row = new KeyboardRow();
-            row.add("Create a reminder \uD83D\uDD14");
-            keyboardRows.add(row);
-
-
-            for (Reminder reminder : reminders) {
-                row = new KeyboardRow();
-                row.add(reminder.getText());
-                keyboardRows.add(row);
-            }
-
-            row = new KeyboardRow();
-            row.add("Back ↩");
-            keyboardRows.add(row);
-
-            keyboardMarkup.setKeyboard(keyboardRows);
-            message.setReplyMarkup(keyboardMarkup);
-
-            try {
-                execute(message);
-
-            } catch (TelegramApiException e) {
-                log.error("Ошибка при отправке сообщения: {}", e.getMessage());
-            }
-    }
-    private void sendCreateReminderKeyboard(long chatId) {
-        SendMessage message = new SendMessage();
-        message.setChatId(String.valueOf(chatId));
-        message.setText("Когда ставим напоминание ?");
-
-        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-        List<KeyboardRow> keyboardRows = new ArrayList<>();
-        KeyboardRow row = new KeyboardRow();
-        row.add("Через час  ⏰");
-        keyboardRows.add(row);
-        row = new KeyboardRow();
-        row.add("Завтра утром 8:00 \uD83D\uDD57");
-        keyboardRows.add(row);
-        row = new KeyboardRow();
-        row.add("Завтра днём 12:00 \uD83D\uDD5B");
-        keyboardRows.add(row);
-        row = new KeyboardRow();
-        row.add("Завтра вечером 17:00 \uD83D\uDD54");
-        keyboardRows.add(row);
-        row = new KeyboardRow();
-        row.add("Послезавтра утром 8:00 \uD83D\uDD57");
-        keyboardRows.add(row);
-        row = new KeyboardRow();
-        row.add("Послезавтра днём 12:00 \uD83D\uDD5B");
-        keyboardRows.add(row);
-        row = new KeyboardRow();
-        row.add("Послезавтра вечером 17:00 \uD83D\uDD54");
-        keyboardRows.add(row);
-        row = new KeyboardRow();
-        row.add("Back ↩");
-        keyboardRows.add(row);
-
-        keyboardMarkup.setKeyboard(keyboardRows);
-        message.setReplyMarkup(keyboardMarkup);
-
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Ошибка при отправке сообщения: {}", e.getMessage());
-        }
-    }
-
-    private void createReminder(long chatId, String messageReminder, Timestamp time){
-
-        User user = userRepository.findByChatId(chatId);
-        if (user == null) {
-            sendMessage(chatId, "Пользователь не найден!");
-            return;
-        }
-        Reminder reminder = new Reminder();
-        reminder.setUser(user);
-        reminder.setText(messageReminder);
-        reminder.setCreatedAt(new Timestamp(System.currentTimeMillis()));
-        reminder.setWorkAt(time);
-        reminderRepository.save(reminder);
-
-
-        long delay = time.getTime() - System.currentTimeMillis();
-        if (delay > 0) {
-            scheduleReminder(delay, "\uD83D\uDD14 Напоминание : " + reminder.getText(), chatId, reminder.getId());
-
-        }else {
-            sendMessage(chatId, "Время напоминания уже прошло!");
-        }
-
-        sendMessage(chatId, "Напоминалка сохранена успешно! ✅");
-
-
-    }
-    private void scheduleReminder(long delay, String message, long chatId, long reminderId){
-        Timer timer = new Timer();
-        TimerTask reminderTask = new TimerTask() {
-            @Override
-            public void run() {
-                sendMessage(chatId, message);
-                reminderRepository.deleteById(reminderId);
-            }
-
-
-        };
-        timer.schedule(reminderTask, delay);
-    }
-
-    private Timestamp getTime(String messageText) {
-        if (messageText.equals("Через час  ⏰")) {
-            Calendar calendar = Calendar.getInstance();
-
-            Date currentDate = new Date();
-            calendar.setTime(currentDate);
-
-            calendar.add(Calendar.HOUR_OF_DAY, 1);
-
-            Date date = calendar.getTime();
-
-            return new Timestamp(date.getTime());
-        } else if (messageText.equals("Завтра утром 8:00 \uD83D\uDD57")) {
-            Calendar calendar;
-            Date date;
-            calendar = Calendar.getInstance();
-
-            calendar.set(Calendar.HOUR_OF_DAY, 8);
-            calendar.set(Calendar.MINUTE, 0);
-            calendar.set(Calendar.SECOND, 0);
-            calendar.set(Calendar.MILLISECOND, 0);
-
-            calendar.add(Calendar.DAY_OF_MONTH, 1);
-
-            date = calendar.getTime();
-
-            return new Timestamp(date.getTime());
-        } else if (messageText.equals("Завтра днём 12:00 \uD83D\uDD5B")) {
-            Calendar calendar;
-            Date date;
-            calendar = Calendar.getInstance();
-
-            calendar.set(Calendar.HOUR_OF_DAY, 12);
-            calendar.set(Calendar.MINUTE, 0);
-            calendar.set(Calendar.SECOND, 0);
-            calendar.set(Calendar.MILLISECOND, 0);
-
-            calendar.add(Calendar.DAY_OF_MONTH, 1);
-
-            date = calendar.getTime();
-
-            return new Timestamp(date.getTime());
-        } else if (messageText.equals("Завтра вечером 17:00 \uD83D\uDD54")) {
-            Calendar calendar;
-            Date date;
-            calendar = Calendar.getInstance();
-
-            calendar.set(Calendar.HOUR_OF_DAY, 17);
-            calendar.set(Calendar.MINUTE, 0);
-            calendar.set(Calendar.SECOND, 0);
-            calendar.set(Calendar.MILLISECOND, 0);
-
-            calendar.add(Calendar.DAY_OF_MONTH, 1);
-
-            date = calendar.getTime();
-
-            return new Timestamp(date.getTime());
-        } else if (messageText.equals("Послезавтра утром 8:00 \uD83D\uDD57")) {
-            Calendar calendar;
-            Date date;
-            calendar = Calendar.getInstance();
-
-
-            calendar.set(Calendar.HOUR_OF_DAY, 8);
-            calendar.set(Calendar.MINUTE, 0);
-            calendar.set(Calendar.SECOND, 0);
-            calendar.set(Calendar.MILLISECOND, 0);
-
-            calendar.add(Calendar.DAY_OF_MONTH, 2);
-
-            date = calendar.getTime();
-
-            return new Timestamp(date.getTime());
-        }else if (messageText.equals("Послезавтра днём 12:00 \uD83D\uDD5B")) {
-            Calendar calendar;
-            Date date;
-            calendar = Calendar.getInstance();
-
-
-            calendar.set(Calendar.HOUR_OF_DAY, 12);
-            calendar.set(Calendar.MINUTE, 0);
-            calendar.set(Calendar.SECOND, 0);
-            calendar.set(Calendar.MILLISECOND, 0);
-
-            calendar.add(Calendar.DAY_OF_MONTH, 2);
-
-            date = calendar.getTime();
-
-            return new Timestamp(date.getTime());
-        }else if (messageText.equals("Послезавтра вечером 17:00 \uD83D\uDD54")) {
-            Calendar calendar;
-            Date date;
-            calendar = Calendar.getInstance();
-
-
-            calendar.set(Calendar.HOUR_OF_DAY, 17);
-            calendar.set(Calendar.MINUTE, 0);
-            calendar.set(Calendar.SECOND, 0);
-            calendar.set(Calendar.MILLISECOND, 0);
-
-            calendar.add(Calendar.DAY_OF_MONTH, 2);
-
-            date = calendar.getTime();
-
-            return new Timestamp(date.getTime());
-        }
-        return null;
-    }
-
-
-
 
 }
